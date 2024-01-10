@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-# Updated video path
+# get the video
 video_path = r'C:\Users\Carlo\Repos\floaty_bubbles\vids\0_0_60_0_0-10-01-24.avi'
 cap = cv2.VideoCapture(video_path)
 
@@ -10,7 +10,7 @@ fps = cap.get(cv2.CAP_PROP_FPS)
 width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-# Define the region to ignore (bottom 20 mm)
+# ignore bottom 20 mm because of 
 ignore_region_height = int(20 / 25.4 * cap.get(cv2.CAP_PROP_FPS))  # Convert 20 mm to pixels at 25.4 mm/inch
 roi = (0, 0, width, height - ignore_region_height)
 
@@ -29,6 +29,7 @@ num_contours_to_draw = 3
 
 # Morphological operations kernel size
 morph_kernel_size = 2
+
 
 # Step 3: Process Frames with Adaptive Thresholding, Morphological Operations, and Contour Detection
 ret, prev_frame = cap.read()

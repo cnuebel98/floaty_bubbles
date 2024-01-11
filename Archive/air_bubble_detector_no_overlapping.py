@@ -1,10 +1,9 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
 
 # Constants
-VIDEO_PATH = r'C:\Users\Carlo\Repos\floaty_bubbles\vids\0_0_60_0_0-10-01-24.avi'
-OUTPUT_VIDEO_NAME = 'valves_1_3_5.avi'
+VIDEO_PATH = r'C:\Users\Carlo\Repos\floaty_bubbles\vids\0_60_0_60_0-10-1-24.avi'
+OUTPUT_VIDEO_NAME = 'valves_3.avi'
 WIN_SIZE = (15, 15)
 ADAPTIVE_THRESH_BLOCK_SIZE = 11
 ADAPTIVE_THRESH_CONSTANT = 2
@@ -26,7 +25,7 @@ roi = (0, 0, width, height - ignore_region_height)
 fourcc = cv2.VideoWriter_fourcc(*'XVID')
 output_video = cv2.VideoWriter(OUTPUT_VIDEO_NAME, fourcc, fps, (width, height - ignore_region_height))
 
-# Parameters for Lucas-Kanade Optical Flow
+# Parameters for Lucas-Kanade Optical Flow, this is the algorithm that tracks feature across frames
 lk_params = dict(winSize=WIN_SIZE, maxLevel=2, criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
 
 # Smaller epsilon for smoother contours
@@ -39,10 +38,6 @@ max_ellipse_diameter = width / 2
 # Scale bar length in pixels (adjust as needed)
 scale_bar_length = 150
 
-# Lists to store data for the diagram
-average_sizes = []
-num_ellipses = []
-
 # Process Frames with Adaptive Thresholding, Morphological Operations, and Contour Detection
 # Read the first frame from the video
 ret, prev_frame = cap.read()
@@ -52,11 +47,6 @@ prev_frame = prev_frame[roi[1]:roi[3], roi[0]:roi[2]]
 
 # Convert the frame to grayscale
 prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
-
-# Initialize ellipses for tracking
-ellipses_for_tracking = []
-
-frame_number = 0  # Counter for frame number
 
 while True:
     ret, frame = cap.read()
@@ -89,10 +79,8 @@ while True:
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
 
     num_contours_to_draw = min(10, len(contours))
-    total_size = 0
 
     # Draw the specified number of contours with ellipses
-    ellipses_for_frame = []  # List to store ellipses for counting
     for i in range(min(num_contours_to_draw, len(contours))):
         contour = contours[i]
 
@@ -100,7 +88,7 @@ while True:
         if len(contour) >= 5:
             ellipse = cv2.fitEllipse(contour)
 
-            # Calculate major and minor diameters
+           # Calculate major and minor diameters
             major_diameter = max(ellipse[1])
             minor_diameter = min(ellipse[1])
 
@@ -109,33 +97,26 @@ while True:
                 # Check if the major axis is at least 100 pixels and smaller than half the image
                 if major_diameter < max_ellipse_diameter:
                     if major_diameter >= min_ellipse_diameter:
-                        # Draw the ellipse
-                        cv2.ellipse(frame, ellipse, (0, 255, 0), 2)
+                        # Check for overlapping ellipses
+                        overlapping = False
+                        for j in range(i + 1, min(num_contours_to_draw, len(contours))):
+                            other_contour = contours[j]
+                            other_ellipse = cv2.fitEllipse(other_contour)
 
-                        # Draw the center of the ellipse as a visible dot
-                        center = (int(ellipse[0][0]), int(ellipse[0][1]))
-                        cv2.circle(frame, center, 2, (0, 0, 255), -1)
+                            # Check if ellipses overlap
+                            if cv2.rotatedRectangleIntersection(ellipse, other_ellipse)[0] > 0:
+                                overlapping = True
+                                other_area = cv2.contourArea(other_contour)
+                                current_area = cv2.contourArea(contour)
 
-                        # Save the ellipse for tracking
-                        ellipses_for_tracking.append(ellipse)
-                        ellipses_for_frame.append(ellipse)
+                                # Draw only the larger ellipse
+                                if current_area < other_area:
+                                    cv2.ellipse(frame, other_ellipse, (0, 255, 0), 2)
+                                    break
 
-                        # Display the size of the ellipse as text
-                        size_text = f"Size: {int(cv2.contourArea(contour))} px^2"
-                        cv2.putText(frame, size_text, (int(ellipse[0][0]), int(ellipse[0][1])), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-
-                        # Calculate total size for averaging
-                        total_size += cv2.contourArea(contour)
-
-    # Calculate average size
-    if len(ellipses_for_frame) > 0:
-        average_size = total_size / len(ellipses_for_frame)
-        average_sizes.append(average_size)
-        num_ellipses.append(len(ellipses_for_frame))
-
-        # Display live numbers on the frame
-        cv2.putText(frame, f"Average Size: {average_size:.2f} px^2", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-        cv2.putText(frame, f"Number of Ellipses: {len(ellipses_for_frame)}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                        # Draw the current ellipse if it doesn't overlap or it is the larger one
+                        if not overlapping:
+                            cv2.ellipse(frame, ellipse, (0, 255, 0), 2)
 
     # Add a scale bar at the top-right corner
     scale_bar_start = (width - 10 - scale_bar_length, 10)
@@ -150,28 +131,7 @@ while True:
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-    frame_number += 1
-
 # Release Resources
 cap.release()
 output_video.release()
 cv2.destroyAllWindows()
-
-# Plotting the diagram
-plt.figure(figsize=(12, 6))
-plt.subplot(2, 1, 1)
-plt.plot(average_sizes, label='Average Size')
-plt.title('Average Size of Ellipses Over Time')
-plt.xlabel('Frame Number')
-plt.ylabel('Size (px^2)')
-plt.legend()
-
-plt.subplot(2, 1, 2)
-plt.plot(num_ellipses, label='Number of Ellipses')
-plt.title('Number of Ellipses Over Time')
-plt.xlabel('Frame Number')
-plt.ylabel('Count')
-plt.legend()
-
-plt.tight_layout()
-plt.show()

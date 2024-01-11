@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Constants
-VIDEO_PATH = r'C:\Users\Carlo\Repos\floaty_bubbles\vids\0_0_60_0_0-10-01-24.avi'
+VIDEO_PATH = r'C:\Users\Carlo\Repos\floaty_bubbles\vids\60_0_60_0_60-10-01-24.avi'
 OUTPUT_VIDEO_NAME = 'valves_1_3_5.avi'
 WIN_SIZE = (15, 15)
 ADAPTIVE_THRESH_BLOCK_SIZE = 11

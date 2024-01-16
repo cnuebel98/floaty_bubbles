@@ -18,16 +18,20 @@ fps = cap.get(cv2.CAP_PROP_FPS)
 width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-# Ignore bottom 20 mm because of the bottom video properties when playing the video
+# Ignore bottom 20 mm because of the bottom video properties when 
+# playing the video
 ignore_region_height = int(20 / 25.4 * cap.get(cv2.CAP_PROP_FPS))
 roi = (0, 0, width, height - ignore_region_height)
 
-# Define the codec and create VideoWriter object so that we have the resulting video saved
+# Define the codec and create VideoWriter object so that we have the 
+# resulting video saved
 fourcc = cv2.VideoWriter_fourcc(*'XVID')
-output_video = cv2.VideoWriter(OUTPUT_VIDEO_NAME, fourcc, fps, (width, height - ignore_region_height))
+output_video = cv2.VideoWriter(OUTPUT_VIDEO_NAME, fourcc, fps, 
+                               (width, height - ignore_region_height))
 
 # Parameters for Lucas-Kanade Optical Flow
-lk_params = dict(winSize=WIN_SIZE, maxLevel=2, criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
+lk_params = dict(winSize=WIN_SIZE, maxLevel=2, criteria=(
+    cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
 
 # Smaller epsilon for smoother contours
 epsilon_factor = 0.005
@@ -43,7 +47,8 @@ scale_bar_length = 150
 average_sizes = []
 num_ellipses = []
 
-# Process Frames with Adaptive Thresholding, Morphological Operations, and Contour Detection
+# Process Frames with Adaptive Thresholding, Morphological Operations, 
+# and Contour Detection
 # Read the first frame from the video
 ret, prev_frame = cap.read()
 
@@ -56,7 +61,8 @@ prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
 # Initialize ellipses for tracking
 ellipses_for_tracking = []
 
-frame_number = 0  # Counter for frame number
+# Counter for frame number
+frame_number = 0  
 
 while True:
     ret, frame = cap.read()
@@ -83,7 +89,9 @@ while True:
     morphed_thresh = cv2.erode(morphed_thresh, morph_kernel, iterations=1)
 
     # Find contours in the inverse of the morphed thresholded image
-    contours, _ = cv2.findContours(~morphed_thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(~morphed_thresh, 
+                                   cv2.RETR_EXTERNAL, 
+                                   cv2.CHAIN_APPROX_SIMPLE)
 
     # Sort contours by area or intensity
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
@@ -104,9 +112,11 @@ while True:
             major_diameter = max(ellipse[1])
             minor_diameter = min(ellipse[1])
 
-            # Check if the smallest diameter is at least 1/3 of the largest diameter
+            # Check if the smallest diameter is at least 1/4 of the 
+            # largest diameter
             if minor_diameter >= major_diameter / 4:
-                # Check if the major axis is at least 100 pixels and smaller than half the image
+                # Check if the major axis is at least 100 pixels and 
+                # smaller than half the image
                 if major_diameter < max_ellipse_diameter:
                     if major_diameter >= min_ellipse_diameter:
                         # Draw the ellipse
@@ -121,8 +131,12 @@ while True:
                         ellipses_for_frame.append(ellipse)
 
                         # Display the size of the ellipse as text
-                        size_text = f"Size: {int(cv2.contourArea(contour))} px^2"
-                        cv2.putText(frame, size_text, (int(ellipse[0][0]), int(ellipse[0][1])), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                        size_text = f"Size: {
+                            int(cv2.contourArea(contour))} px^2"
+                        cv2.putText(frame, size_text, 
+                                    (int(ellipse[0][0]), int(ellipse[0][1])), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, 
+                                    (255, 255, 255), 2)
 
                         # Calculate total size for averaging
                         total_size += cv2.contourArea(contour)
@@ -134,8 +148,12 @@ while True:
         num_ellipses.append(len(ellipses_for_frame))
 
         # Display live numbers on the frame
-        cv2.putText(frame, f"Average Size: {average_size:.2f} px^2", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-        cv2.putText(frame, f"Number of Ellipses: {len(ellipses_for_frame)}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        cv2.putText(frame, f"Average Size: {average_size:.2f} px^2", 
+                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 
+                    0.8, (255, 255, 255), 2)
+        cv2.putText(frame, f"Number of Ellipses: {len(ellipses_for_frame)}",
+                     (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 
+                     0.8, (255, 255, 255), 2)
 
     # Add a scale bar at the top-right corner
     scale_bar_start = (width - 10 - scale_bar_length, 10)

@@ -3,13 +3,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Constants
-VIDEO_PATH = r'C:\Users\Carlo\Repos\floaty_bubbles\vids\0_60_0_60_0-10-1-24.avi'
+VIDEO_PATH = r'C:\Users\Carlo\Repos\floaty_bubbles\vids\0_0_60_0_0-10-01-24.avi'
 OUTPUT_VIDEO_NAME = 'valves_1_3_5.avi'
 WIN_SIZE = (15, 15)
-ADAPTIVE_THRESH_BLOCK_SIZE = 11
+ADAPTIVE_THRESH_BLOCK_SIZE = 7
 ADAPTIVE_THRESH_CONSTANT = 2
-MORPH_KERNEL_SIZE_DILATION = 5
-MORPH_KERNEL_SIZE_EROSION = 15
+MORPH_KERNEL_SIZE = 2
 
 # Get the video
 cap = cv2.VideoCapture(VIDEO_PATH)
@@ -37,12 +36,12 @@ lk_params = dict(winSize=WIN_SIZE, maxLevel=2, criteria=(
 # Smaller epsilon for smoother contours
 epsilon_factor = 0.005
 
-# Minimum and maximum diameter for ellipses (150, width/2)
-min_ellipse_diameter = 100
-max_ellipse_diameter = width/1.5
+# Minimum and maximum diameter for ellipses
+min_ellipse_diameter = 150
+max_ellipse_diameter = width / 2
 
 # Scale bar length in pixels (adjust as needed)
-scale_bar_length = 100
+scale_bar_length = 150
 
 # Lists to store data for the diagram
 average_sizes = []
@@ -74,15 +73,23 @@ while True:
     frame = frame[roi[1]:roi[3], roi[0]:roi[2]]
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
+    # Adaptive Thresholding
+    adaptive_thresh = cv2.adaptiveThreshold(
+        gray,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        ADAPTIVE_THRESH_BLOCK_SIZE,
+        ADAPTIVE_THRESH_CONSTANT
+    )
+
     # Normal Thresholding
-    ret, thresh = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+    
     
     # Morphological Operations (Dilation followed by Erosion)
-
-    morph_kernel_dil = np.ones((MORPH_KERNEL_SIZE_DILATION, MORPH_KERNEL_SIZE_DILATION), np.uint8)
-    morph_kernel_ero = np.ones((MORPH_KERNEL_SIZE_EROSION, MORPH_KERNEL_SIZE_EROSION), np.uint8)
-    morphed_thresh = cv2.dilate(thresh, morph_kernel_dil, iterations=1)
-    morphed_thresh = cv2.erode(morphed_thresh, morph_kernel_ero, iterations=1)
+    morph_kernel = np.ones((MORPH_KERNEL_SIZE, MORPH_KERNEL_SIZE), np.uint8)
+    morphed_thresh = cv2.dilate(adaptive_thresh, morph_kernel, iterations=1)
+    morphed_thresh = cv2.erode(morphed_thresh, morph_kernel, iterations=1)
 
     # Find contours in the inverse of the morphed thresholded image
     contours, _ = cv2.findContours(~morphed_thresh, 
@@ -190,4 +197,4 @@ plt.ylabel('Count')
 plt.legend()
 
 plt.tight_layout()
-plt.show()
+#plt.show()

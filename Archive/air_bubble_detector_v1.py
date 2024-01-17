@@ -82,6 +82,8 @@ while True:
     morphed_thresh = cv2.dilate(adaptive_thresh, morph_kernel, iterations=1)
     morphed_thresh = cv2.erode(morphed_thresh, morph_kernel, iterations=1)
 
+    
+
     # Find contours in the inverse of the morphed thresholded image
     contours, _ = cv2.findContours(~morphed_thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 

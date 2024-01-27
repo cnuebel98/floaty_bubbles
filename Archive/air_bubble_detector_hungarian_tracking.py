@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from scipy.optimize import linear_sum_assignment
 import matplotlib.pyplot as plt
 
 # Constants
@@ -11,8 +12,15 @@ ADAPTIVE_THRESH_CONSTANT = 2
 MORPH_KERNEL_SIZE_DILATION = 5
 MORPH_KERNEL_SIZE_EROSION = 15
 
+# Global variable for index counter
+global_index_counter = 0
+
+movement_distance_threshold = 20
+
 # Get the video
 cap = cv2.VideoCapture(VIDEO_PATH)
+if not cap.isOpened():
+    print("Error: Unable to open video file.")
 
 # Get video properties
 fps = cap.get(cv2.CAP_PROP_FPS)
@@ -30,13 +38,6 @@ fourcc = cv2.VideoWriter_fourcc(*'XVID')
 output_video = cv2.VideoWriter(OUTPUT_VIDEO_NAME, fourcc, fps, 
                                (width, height - ignore_region_height))
 
-# Parameters for Lucas-Kanade Optical Flow
-lk_params = dict(winSize=WIN_SIZE, maxLevel=2, criteria=(
-    cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
-
-# Smaller epsilon for smoother contours
-epsilon_factor = 0.005
-
 # Minimum and maximum diameter for ellipses (150, width/2)
 min_ellipse_diameter = 100
 max_ellipse_diameter = width/1.5
@@ -53,23 +54,19 @@ num_ellipses = []
 # Read the first frame from the video
 ret, prev_frame = cap.read()
 
-# Apply the region of interest (ROI) to the first frame
-prev_frame = prev_frame[roi[1]:roi[3], roi[0]:roi[2]]
-
-# Convert the frame to grayscale
-prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
-
-# Initialize ellipses for tracking
-ellipses_for_tracking = []
-
 # Counter for frame number
 frame_number = 0  
+
+
+
+# List to store ellipses for tracking
+prev_ellipses = []
 
 while True:
     ret, frame = cap.read()
     if not ret:
         break
-
+    
     # Apply ROI
     frame = frame[roi[1]:roi[3], roi[0]:roi[2]]
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -125,9 +122,9 @@ while True:
                         center = (int(ellipse[0][0]), int(ellipse[0][1]))
                         cv2.circle(frame, center, 2, (0, 0, 255), -1)
 
-                        # Save the ellipse for tracking
-                        ellipses_for_tracking.append(ellipse)
-                        ellipses_for_frame.append(ellipse)
+                        # Store the ellipse as a dictionary with 'center' key
+                        ellipse_data = {'center': center, 'index': i}
+                        ellipses_for_frame.append(ellipse_data)
 
                         # Display the size of the ellipse as text
                         size_text = f"Size: {int(cv2.contourArea(contour))} px^2"
@@ -135,10 +132,79 @@ while True:
                                     (int(ellipse[0][0]), int(ellipse[0][1])), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, 
                                     (255, 255, 255), 2)
+                        
+                        # Display the index of the ellipse underneath the size
+                        index_text = f"Index: {ellipse_data['index']}"  # Use ellipse_data instead of curr_ellipse
+                        cv2.putText(frame, index_text, 
+                                    (int(ellipse[0][0]), int(ellipse[0][1]) + 20),  # Adjust the vertical position as needed
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, 
+                                    (255, 255, 255), 2)
 
                         # Calculate total size for averaging
                         total_size += cv2.contourArea(contour)
+    
+   # Track ellipses using the Hungarian algorithm
+    if len(prev_ellipses) > 0 and len(ellipses_for_frame) > 0:
+        cost_matrix = np.zeros((len(prev_ellipses), len(ellipses_for_frame)))
+        for i, prev_ellipse in enumerate(prev_ellipses):
+            for j, curr_ellipse in enumerate(ellipses_for_frame):
+                cost_matrix[i, j] = np.linalg.norm(np.array(prev_ellipse['center']) - np.array(curr_ellipse['center']))
 
+        prev_indices, curr_indices = linear_sum_assignment(cost_matrix)
+
+        # Dictionary to store mapping between ellipse indices and unique identifiers
+        ellipse_index_mapping = {}
+
+        # Update ellipses with matching indices
+        matched_ellipses = []
+
+        for prev_index, curr_index in zip(prev_indices, curr_indices):
+            prev_ellipse = prev_ellipses[prev_index]
+            curr_ellipse = ellipses_for_frame[curr_index]
+
+            # For example, you might want to store the movement distance
+            movement_distance = np.linalg.norm(np.array(prev_ellipse['center']) - np.array(curr_ellipse['center']))
+
+            # Check if the movement distance is below the threshold
+            if movement_distance < movement_distance_threshold:
+                # If the current ellipse is new, assign a new unique identifier
+                if curr_index not in ellipse_index_mapping:
+                    ellipse_index_mapping[curr_index] = global_index_counter
+                    global_index_counter += 1
+
+                # Store additional information in the current ellipse data
+                curr_ellipse['movement_distance'] = movement_distance
+                curr_ellipse['index'] = ellipse_index_mapping[curr_index]
+
+                # Store matched ellipse for future tracking
+                matched_ellipses.append(curr_ellipse)
+            else:
+                # If movement distance is above threshold, consider it as a new ellipse
+                curr_ellipse['movement_distance'] = movement_distance
+                curr_ellipse['index'] = global_index_counter
+                global_index_counter += 1
+
+                # Store the new ellipse for future tracking
+                matched_ellipses.append(curr_ellipse)
+
+        # Identify unmatched ellipses and mark them with a special value
+        unmatched_indices = set(range(len(ellipses_for_frame))) - set(curr_indices)
+        for unmatched_index in unmatched_indices:
+            unmatched_ellipse = ellipses_for_frame[unmatched_index]
+            unmatched_ellipse['movement_distance'] = 0  # Set a value indicating no movement
+            unmatched_ellipse['index'] = global_index_counter  # Assign a new unique identifier
+            global_index_counter += 1  # Increment the global counter
+
+            # Store the unmatched ellipse for future tracking
+            matched_ellipses.append(unmatched_ellipse)
+
+        # Update previous ellipses for the next iteration
+        prev_ellipses = matched_ellipses
+            
+    else:
+        # If it's the first frame, just use the current ellipses for tracking
+        prev_ellipses = ellipses_for_frame
+        
     # Calculate average size
     if len(ellipses_for_frame) > 0:
         average_size = total_size / len(ellipses_for_frame)

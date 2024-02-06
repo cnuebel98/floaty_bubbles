@@ -1,15 +1,21 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+from object_tracker import *
 
 # Constants
 VIDEO_PATH = r'C:\Users\Carlo\Repos\floaty_bubbles\vids\0_0_60_0_0-10-01-24.avi'
 OUTPUT_VIDEO_NAME = 'valves_1_3_5.avi'
 WIN_SIZE = (15, 15)
-ADAPTIVE_THRESH_BLOCK_SIZE = 11
-ADAPTIVE_THRESH_CONSTANT = 2
-MORPH_KERNEL_SIZE_DILATION = 5
-MORPH_KERNEL_SIZE_EROSION = 15
+
+# Dil 5 and ero 15 has the cleanest size graph
+MORPH_KERNEL_SIZE_DILATION = 5 
+MORPH_KERNEL_SIZE_EROSION = 19 
+
+# Create tracker object
+tracker = EuclideanDistTracker()
+
+#object_detector = cv2.createBackgroundSubtractorMOG2(history=100, varThreshold=40)
 
 # Get the video
 cap = cv2.VideoCapture(VIDEO_PATH)
@@ -30,10 +36,6 @@ fourcc = cv2.VideoWriter_fourcc(*'XVID')
 output_video = cv2.VideoWriter(OUTPUT_VIDEO_NAME, fourcc, fps, 
                                (width, height - ignore_region_height))
 
-# Parameters for Lucas-Kanade Optical Flow
-lk_params = dict(winSize=WIN_SIZE, maxLevel=2, criteria=(
-    cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
-
 # Smaller epsilon for smoother contours
 epsilon_factor = 0.005
 
@@ -48,19 +50,8 @@ scale_bar_length = 100
 average_sizes = []
 num_ellipses = []
 
-# Process Frames with Adaptive Thresholding, Morphological Operations, 
-# and Contour Detection
 # Read the first frame from the video
-ret, prev_frame = cap.read()
-
-# Apply the region of interest (ROI) to the first frame
-prev_frame = prev_frame[roi[1]:roi[3], roi[0]:roi[2]]
-
-# Convert the frame to grayscale
-prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
-
-# Initialize ellipses for tracking
-ellipses_for_tracking = []
+ret, _ = cap.read()
 
 # Counter for frame number
 frame_number = 0  
@@ -84,25 +75,56 @@ while True:
     morphed_thresh = cv2.dilate(thresh, morph_kernel_dil, iterations=1)
     morphed_thresh = cv2.erode(morphed_thresh, morph_kernel_ero, iterations=1)
 
+    #morphed_thresh = cv2.GaussianBlur(morphed_thresh, (21, 21), 0)
+
+
     # Find contours in the inverse of the morphed thresholded image
     contours, _ = cv2.findContours(~morphed_thresh, 
                                    cv2.RETR_EXTERNAL, 
                                    cv2.CHAIN_APPROX_SIMPLE)
+
+    detections = []
 
     # Sort contours by area or intensity
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
 
     num_contours_to_draw = min(10, len(contours))
     total_size = 0
-
+    
+    curves_for_frame = [] 
+    
     # Draw the specified number of contours with ellipses
     ellipses_for_frame = []  # List to store ellipses for counting
     for i in range(min(num_contours_to_draw, len(contours))):
         contour = contours[i]
         
+        #-------------------------------------------------------------
+        # determine smoothness of contours
+        epsilon = 0.001 * cv2.arcLength(contour, True)
+        smooth_contour = cv2.approxPolyDP(contour, epsilon, True)
+
         # Draw the contour
-        cv2.drawContours(frame, [contour], -1, (255, 0, 0), 1)
+        cv2.drawContours(frame, [smooth_contour], -1, (255, 0, 0), 1)
+        #-------------------------------------------------------------
         
+        #-------------------------------------------------------------
+        # Fit a polynomial curve to the contour points
+        #curve_fit = np.polyfit(contour[:, 0, 0], contour[:, 0, 1], deg=6)
+        #curve_points_x = np.linspace(min(contour[:, 0, 0]), max(contour[:, 0, 0]), num=100)
+        #curve_points_y = np.polyval(curve_fit, curve_points_x)
+        #curve_points = np.column_stack((curve_points_x, curve_points_y))
+
+        # Ensure integer type for drawing
+        #curve_points = curve_points.astype(np.int32)
+
+        #curve_points = curve_points.reshape((-1, 1, 2))
+        
+        # Draw the curve
+        #cv2.polylines(frame, [curve_points], isClosed=True, color=(255, 0, 0), thickness=1)
+        #-------------------------------------------------------------
+
+
+
         # Fit an ellipse to the contour
         if len(contour) >= 5:
             ellipse = cv2.fitEllipse(contour)
@@ -118,15 +140,15 @@ while True:
                 # smaller than half the image
                 if major_diameter < max_ellipse_diameter:
                     if major_diameter >= min_ellipse_diameter:
+                    
                         # Draw the ellipse
                         cv2.ellipse(frame, ellipse, (0, 255, 0), 2)
 
                         # Draw the center of the ellipse as a visible dot
                         center = (int(ellipse[0][0]), int(ellipse[0][1]))
+                        detections.append(center)
                         cv2.circle(frame, center, 2, (0, 0, 255), -1)
 
-                        # Save the ellipse for tracking
-                        ellipses_for_tracking.append(ellipse)
                         ellipses_for_frame.append(ellipse)
 
                         # Display the size of the ellipse as text
@@ -138,6 +160,12 @@ while True:
 
                         # Calculate total size for averaging
                         total_size += cv2.contourArea(contour)
+
+    # 2. Object Tracking
+    objects_ids = tracker.update(detections)
+    for object_id in objects_ids:
+        cx, cy, id = object_id
+        cv2.putText(frame, "ID: " + str(id), (cx, cy+20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
     # Calculate average size
     if len(ellipses_for_frame) > 0:
@@ -162,7 +190,13 @@ while True:
     output_video.write(frame)
 
     # Visualization
+    cv2.imshow('preprocessing', ~morphed_thresh)
     cv2.imshow('Processed Frame', frame)
+
+    key = cv2.waitKey(30)
+    if key == 27:
+        break
+
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 

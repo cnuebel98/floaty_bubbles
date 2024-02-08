@@ -10,7 +10,7 @@ WIN_SIZE = (15, 15)
 
 # Dil 5 and ero 15 has the cleanest size graph
 MORPH_KERNEL_SIZE_DILATION = 5 
-MORPH_KERNEL_SIZE_EROSION = 19 
+MORPH_KERNEL_SIZE_EROSION = 15 
 
 # Create tracker object
 tracker = EuclideanDistTracker()
@@ -47,7 +47,8 @@ max_ellipse_diameter = width/1.5
 scale_bar_length = 100
 
 # Lists to store data for the diagram
-average_sizes = []
+average_sizes_ellipses = []
+average_sizes_contours = []
 num_ellipses = []
 
 # Read the first frame from the video
@@ -63,10 +64,14 @@ while True:
 
     # Apply ROI
     frame = frame[roi[1]:roi[3], roi[0]:roi[2]]
+
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
 
     # Normal Thresholding
     ret, thresh = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+    
+    #thresh = cv2.GaussianBlur(thresh, (11, 11), 0)
     
     # Morphological Operations (Dilation followed by Erosion)
 
@@ -89,8 +94,9 @@ while True:
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
 
     num_contours_to_draw = min(10, len(contours))
-    total_size = 0
-    
+    total_size_contour = 0
+    total_size_ellipse = 0
+
     curves_for_frame = [] 
     
     # Draw the specified number of contours with ellipses
@@ -104,7 +110,7 @@ while True:
         smooth_contour = cv2.approxPolyDP(contour, epsilon, True)
 
         # Draw the contour
-        cv2.drawContours(frame, [smooth_contour], -1, (255, 0, 0), 1)
+        cv2.drawContours(frame, [smooth_contour], -1, (255, 0, 0), 2)
         #-------------------------------------------------------------
         
         #-------------------------------------------------------------
@@ -122,9 +128,17 @@ while True:
         # Draw the curve
         #cv2.polylines(frame, [curve_points], isClosed=True, color=(255, 0, 0), thickness=1)
         #-------------------------------------------------------------
-
-
-
+        
+        # Calculate centroids of Contours
+        M = cv2.moments(contour)
+        
+        # Calculate centroid using moments
+        if M["m00"] != 0:
+            centroid_x = int(M["m10"] / M["m00"])
+            centroid_y = int(M["m01"] / M["m00"])
+        else:
+            centroid_x, centroid_y = 0, 0
+        
         # Fit an ellipse to the contour
         if len(contour) >= 5:
             ellipse = cv2.fitEllipse(contour)
@@ -134,32 +148,45 @@ while True:
             minor_diameter = min(ellipse[1])
 
             # Check if the smallest diameter is at least 1/4 of the 
-            # largest diameter
-            if minor_diameter >= major_diameter / 4:
-                # Check if the major axis is at least 100 pixels and 
-                # smaller than half the image
-                if major_diameter < max_ellipse_diameter:
-                    if major_diameter >= min_ellipse_diameter:
-                    
-                        # Draw the ellipse
-                        cv2.ellipse(frame, ellipse, (0, 255, 0), 2)
+            # largest diameter and if the major axis is at least 100 
+            # pixels and smaller than half the image
+            if (minor_diameter >= major_diameter / 4 
+                and major_diameter < max_ellipse_diameter 
+                and major_diameter >= min_ellipse_diameter):
+                
+                # Draw the ellipse
+                cv2.ellipse(frame, ellipse, (0, 255, 0), 2)
 
-                        # Draw the center of the ellipse as a visible dot
-                        center = (int(ellipse[0][0]), int(ellipse[0][1]))
-                        detections.append(center)
-                        cv2.circle(frame, center, 2, (0, 0, 255), -1)
+                # Center of Ellipses and contours
+                center_ellipse = (int(ellipse[0][0]), int(ellipse[0][1]))   
+                center_contour = (int(centroid_x), int(centroid_y))
 
-                        ellipses_for_frame.append(ellipse)
+                # Decide which centers to track
+                detections.append(center_contour)                                   #-----------------------------------------------   This is where center for object detection is set
 
-                        # Display the size of the ellipse as text
-                        size_text = f"Size: {int(cv2.contourArea(contour))} px^2"
-                        cv2.putText(frame, size_text, 
-                                    (int(ellipse[0][0]), int(ellipse[0][1])), 
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, 
-                                    (255, 255, 255), 2)
+                # Draw center of ellipses (green) and contours (blue)
+                cv2.circle(frame, center_ellipse, 5, (0, 255, 0), -1)
+                cv2.circle(frame, (centroid_x, centroid_y), 5, (255, 0, 0), -1)
 
-                        # Calculate total size for averaging
-                        total_size += cv2.contourArea(contour)
+                ellipses_for_frame.append(ellipse)
+
+                # Display the size of the ellipse as text
+                size_text = f"Size Ellipse: {int(math.pi*major_diameter*minor_diameter)} px^2"
+                cv2.putText(frame, size_text, 
+                            (int(ellipse[0][0]), int(ellipse[0][1])), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, 
+                            (255, 255, 255), 2)
+                
+                    # Display the size of the contour as text
+                size_text = f"Size Contour: {int(cv2.contourArea(contour))} px^2"
+                cv2.putText(frame, size_text, 
+                            (int(centroid_x), int(centroid_y)), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, 
+                            (255, 255, 255), 2)
+                
+                # Calculate total size for averaging
+                total_size_contour += cv2.contourArea(contour)
+                total_size_ellipse += math.pi*major_diameter*minor_diameter
 
     # 2. Object Tracking
     objects_ids = tracker.update(detections)
@@ -169,12 +196,20 @@ while True:
 
     # Calculate average size
     if len(ellipses_for_frame) > 0:
-        average_size = total_size / len(ellipses_for_frame)
-        average_sizes.append(average_size)
+        
+        average_size_contour = total_size_contour / len(ellipses_for_frame)
+        average_size_ellipse = total_size_ellipse / len(ellipses_for_frame)
+        
+        average_sizes_contours.append(average_size_contour)
+        average_sizes_ellipses.append(average_size_ellipse)
+        
         num_ellipses.append(len(ellipses_for_frame))
 
         # Display live numbers on the frame
-        cv2.putText(frame, f"Average Size: {average_size:.2f} px^2", 
+        cv2.putText(frame, f"Average Size Contours/Frame: {average_size_ellipse:.2f} px^2", 
+                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 
+                    0.8, (255, 255, 255), 2)
+        cv2.putText(frame, f"Average Size Ellipses/Frame: {average_size_ellipse:.2f} px^2", 
                     (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 
                     0.8, (255, 255, 255), 2)
         cv2.putText(frame, f"Number of Ellipses: {len(ellipses_for_frame)}",
@@ -210,7 +245,8 @@ cv2.destroyAllWindows()
 # Plotting the diagram
 plt.figure(figsize=(12, 6))
 plt.subplot(2, 1, 1)
-plt.plot(average_sizes, label='Average Size')
+plt.plot(average_sizes_ellipses, label='Average Size Ellipses')
+plt.plot(average_sizes_contours, label='Average Size Contours')
 plt.title('Average Size of Ellipses Over Time')
 plt.xlabel('Frame Number')
 plt.ylabel('Size (px^2)')

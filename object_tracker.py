@@ -4,6 +4,9 @@ class EuclideanDistTracker:
     def __init__(self):
         # Store the center positions of the objects
         self.center_points = {}
+        self.center_points_1 = {}
+        self.center_points_2 = {}
+        self.center_points_3 = {}
         # Keep the count of the IDs
         # each time a new object id detected, the count will increase by one
         self.id_count = 0
@@ -28,6 +31,38 @@ class EuclideanDistTracker:
                     same_object_detected = True
                     break
 
+
+            for id, pt in self.center_points_1.items():
+                dist = math.hypot(cx - pt[0], cy - pt[1])
+
+                if dist < 100:
+                    self.center_points[id] = (cx, cy)
+                    print(self.center_points)
+                    objects_ids.append((cx, cy, id))
+                    same_object_detected = True
+                    break
+            
+            for id, pt in self.center_points_2.items():
+                dist = math.hypot(cx - pt[0], cy - pt[1])
+
+                if dist < 100:
+                    self.center_points[id] = (cx, cy)
+                    print(self.center_points)
+                    objects_ids.append((cx, cy, id))
+                    same_object_detected = True
+                    break
+
+            for id, pt in self.center_points_3.items():
+                dist = math.hypot(cx - pt[0], cy - pt[1])
+
+                if dist < 100:
+                    self.center_points[id] = (cx, cy)
+                    print(self.center_points)
+                    objects_ids.append((cx, cy, id))
+                    same_object_detected = True
+                    break
+
+
             # New object is detected we assign the ID to that object
             if same_object_detected is False:
                 self.center_points[self.id_count] = (cx, cy)
@@ -42,5 +77,9 @@ class EuclideanDistTracker:
             new_center_points[object_id] = center
 
         # Update dictionary with IDs not used removed
+            
+        self.center_points_3 = self.center_points_2.copy()
+        self.center_points_2 = self.center_points_1.copy()
+        self.center_points_1 = self.center_points.copy()
         self.center_points = new_center_points.copy()
         return objects_ids

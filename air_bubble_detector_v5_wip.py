@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from object_tracker import *
 
 # Constants
-VIDEO_PATH = r'C:\Users\Carlo\Repos\floaty_bubbles\vids\0_0_60_0_0-10-01-24.avi'
+VIDEO_PATH = r'C:\Users\Carlo\Repos\floaty_bubbles\vids\0_60_0_60_0-10-1-24.avi'
 OUTPUT_VIDEO_NAME = 'valves_1_3_5.avi'
 WIN_SIZE = (15, 15)
 
@@ -41,6 +41,7 @@ scale_bar_length = 8
 
 # Lists to store data for the diagram
 average_sizes_contours = []
+total_sizes_contours = []
 num_contours_per_frame = []
 ids_and_sizes = {}
 first_detected_frame = {}
@@ -75,7 +76,7 @@ while True:
     morphed_thresh_dil = cv2.dilate(thresh, morph_kernel_dil, iterations=1)
     morphed_thresh_ero = cv2.erode(morphed_thresh_dil, morph_kernel_ero, iterations=1)
 
-    #morphed_thresh = cv2.GaussianBlur(morphed_thresh, (21, 21), 0)
+    #morphed_thresh = cv2.GaussianBlur(morphed_thresh_ero, (11, 11), 0)
 
     # Find contours in the inverse of the morphed thresholded image
     contours, _ = cv2.findContours(~morphed_thresh_ero, 
@@ -145,6 +146,7 @@ while True:
         
         average_size_contour = total_size_contour / len(contour)
         average_sizes_contours.append(average_size_contour)
+        total_sizes_contours.append(total_size_contour)
         num_contours_per_frame.append(len(contours_for_counting))
         
         for object_id, size in zip(objects_ids, average_sizes_contours):
@@ -194,8 +196,8 @@ cv2.destroyAllWindows()
 # Plotting the diagram
 plt.figure(figsize=(12, 6))
 plt.subplot(2, 1, 1)
-plt.plot(average_sizes_contours, label='Average Size Contours')
-plt.title('Average Size of Contours Over Time')
+plt.plot(total_sizes_contours, "o", label='Total Size Contours')
+plt.title('Total Size of Contours Over Time')
 plt.xlabel('Frame Number')
 plt.ylabel('Size (px^2)')
 # Annotate the plot with IDs at the corresponding frame on the x-axis where they are first detected

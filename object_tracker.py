@@ -30,7 +30,7 @@ class EuclideanDistTracker:
 
                 if dist < 100:
                     self.center_points[id] = (cx, cy)
-                    #print(self.center_points)
+                    print(self.center_points)
                     objects_ids.append((cx, cy, id))
                     same_object_detected = True
                     break
@@ -40,7 +40,7 @@ class EuclideanDistTracker:
 
                 if dist < 100:
                     self.center_points[id] = (cx, cy)
-                    #print(self.center_points)
+                    print(self.center_points)
                     objects_ids.append((cx, cy, id))
                     same_object_detected = True
                     break
@@ -50,7 +50,7 @@ class EuclideanDistTracker:
 
                 if dist < 100:
                     self.center_points[id] = (cx, cy)
-                    #print(self.center_points)
+                    print(self.center_points)
                     objects_ids.append((cx, cy, id))
                     same_object_detected = True
                     break
@@ -60,7 +60,7 @@ class EuclideanDistTracker:
 
                 if dist < 100:
                     self.center_points[id] = (cx, cy)
-                    #print(self.center_points)
+                    print(self.center_points)
                     objects_ids.append((cx, cy, id))
                     same_object_detected = True
                     break
@@ -70,7 +70,7 @@ class EuclideanDistTracker:
 
                 if dist < 100:
                     self.center_points[id] = (cx, cy)
-                    #print(self.center_points)
+                    print(self.center_points)
                     objects_ids.append((cx, cy, id))
                     same_object_detected = True
                     break
@@ -80,7 +80,7 @@ class EuclideanDistTracker:
 
                 if dist < 100:
                     self.center_points[id] = (cx, cy)
-                    #print(self.center_points)
+                    print(self.center_points)
                     objects_ids.append((cx, cy, id))
                     same_object_detected = True
                     break

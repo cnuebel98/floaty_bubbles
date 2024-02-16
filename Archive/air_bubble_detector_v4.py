@@ -12,8 +12,6 @@ WIN_SIZE = (15, 15)
 MORPH_KERNEL_SIZE_DILATION = 5 
 MORPH_KERNEL_SIZE_EROSION = 15 
 
-# Create tracker object
-tracker = EuclideanDistTracker()
 
 #object_detector = cv2.createBackgroundSubtractorMOG2(history=100, varThreshold=40)
 
@@ -24,6 +22,9 @@ cap = cv2.VideoCapture(VIDEO_PATH)
 fps = cap.get(cv2.CAP_PROP_FPS)
 width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+# Create tracker object
+tracker = EuclideanDistTracker(width)
 
 # Ignore bottom 20 mm because of the bottom video properties when 
 # playing the video

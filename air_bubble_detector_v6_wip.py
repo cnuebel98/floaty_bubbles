@@ -2,10 +2,11 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from object_tracker import *
+from scipy.ndimage import gaussian_filter
 
 # Constants
-VIDEO_PATH = r'C:\Users\Carlo\Repos\floaty_bubbles\vids\0_60_0_60_0-10-1-24.avi'
-OUTPUT_VIDEO_NAME = 'valves_1_3_5.avi'
+VIDEO_PATH = r'C:\Users\Carlo\Repos\floaty_bubbles\vids\less_particles\0_0_60_0_0-10-01-24.avi'
+OUTPUT_VIDEO_NAME = 'valves_3.avi'
 WIN_SIZE = (15, 15)
 
 # Dil 5 and ero 15 has the cleanest size graph
@@ -62,19 +63,34 @@ while True:
     # Apply ROI
     frame = frame[roi[1]:roi[3], roi[0]:roi[2]]
 
+
     #frame_gauss = cv2.GaussianBlur(frame, (25, 25), 0)
+    #frame_gauss = gaussian_filter(frame, sigma=2)
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
     # Normal Thresholding
     ret, thresh = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
     
-    # Morphological Operations (Dilation followed by Erosion)
-    morph_kernel_dil = np.ones((MORPH_KERNEL_SIZE_DILATION, MORPH_KERNEL_SIZE_DILATION), np.uint8)
-    morph_kernel_ero = np.ones((MORPH_KERNEL_SIZE_EROSION, MORPH_KERNEL_SIZE_EROSION), np.uint8)
+    
+    # Create a circular structuring element
+    radius_dil = 4
+    radius_ero = 10
 
-    morphed_thresh_dil = cv2.dilate(thresh, morph_kernel_dil, iterations=1)
-    morphed_thresh_ero = cv2.erode(morphed_thresh_dil, morph_kernel_ero, iterations=1)
+    kernel_dil = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2*radius_dil+1, 2*radius_dil+1))
+    kernel_ero = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2*radius_ero+1, 2*radius_ero+1))
+    
+    # Morphological Operations (Dilation followed by Erosion)
+    #morph_kernel_dil = np.ones((MORPH_KERNEL_SIZE_DILATION, MORPH_KERNEL_SIZE_DILATION), np.uint8)
+    #morph_kernel_ero = np.ones((MORPH_KERNEL_SIZE_EROSION, MORPH_KERNEL_SIZE_EROSION), np.uint8)
+
+    # Ero and dil with circular kernel
+    morphed_thresh_dil = cv2.dilate(thresh, kernel_dil, iterations = 1)
+    morphed_thresh_ero = cv2.erode(morphed_thresh_dil, kernel_ero, iterations = 1)
+
+    # Ero and Dil with square kernel
+    #morphed_thresh_dil = cv2.dilate(thresh, morph_kernel_dil, iterations=1)
+    #morphed_thresh_ero = cv2.erode(morphed_thresh_dil, kernel_ero, iterations=1)
 
     #morphed_thresh = cv2.GaussianBlur(morphed_thresh_ero, (11, 11), 0)
 
@@ -97,7 +113,7 @@ while True:
         contour = contours[i]
         
         if (len(contour) >= 5 and cv2.contourArea(contour) > 2000  
-            and cv2.contourArea(contour)< 300000):
+            and cv2.contourArea(contour) < 300000):
 
                 #-------------------------------------------------------------
                 # determine smoothness of contours
@@ -136,7 +152,7 @@ while True:
                 total_size_contour += cv2.contourArea(contour)
 
     # 2. Object Tracking
-    objects_ids = tracker.update(detections)
+    objects_ids = tracker.update(detections, frame_number)
     for object_id in objects_ids:
         cx, cy, id = object_id
         cv2.putText(frame, "ID: " + str(id), (cx, cy+20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
@@ -170,13 +186,15 @@ while True:
     #scale_bar_start = (width - 10 - scale_bar_length, 10)
     #scale_bar_end = (width - 10, 10)
 
-    cv2.line(frame, scale_bar_start, scale_bar_end, (255, 255, 255), 2)
+    #cv2.line(frame, scale_bar_start, scale_bar_end, (255, 255, 255), 2)
 
     # Save Processed Frame to Output Video
     output_video.write(frame)
 
     # Visualization
-    cv2.imshow('preprocessing', ~morphed_thresh_ero)
+    cv2.imshow('dil+ero', ~morphed_thresh_ero)
+    cv2.imshow('dil', ~morphed_thresh_dil)
+    
     cv2.imshow('Processed Frame', frame)
 
     key = cv2.waitKey(30)
@@ -195,9 +213,9 @@ cv2.destroyAllWindows()
 
 # Plotting the diagram
 plt.figure(figsize=(12, 6))
-plt.subplot(2, 1, 1)
+plt.subplot(4, 1, 1)
 plt.plot(total_sizes_contours, "o", label='Total Size Contours')
-plt.title('Total Size of Contours Over Time')
+plt.title('Total Size of Contours per frame')
 plt.xlabel('Frame Number')
 plt.ylabel('Size (px^2)')
 # Annotate the plot with IDs at the corresponding frame on the x-axis where they are first detected
@@ -205,12 +223,18 @@ for id, size in ids_and_sizes.items():
     plt.text(first_detected_frame[id], size, str(id), fontsize=14, color='red')
 plt.legend()
 
-plt.subplot(2, 1, 2)
+plt.subplot(4, 1, 2)
 plt.plot(num_contours_per_frame, label='Number of Contours')
 plt.title('Number of Contours per frame')
 plt.xlabel('Frame Number')
 plt.ylabel('Count')
 plt.legend()
+
+plt.subplot(4, 1, 3)
+tracker.plot_distances()
+
+plt.subplot(4, 1, 4)
+tracker.plot_total_distances()
 
 plt.tight_layout()
 plt.show()

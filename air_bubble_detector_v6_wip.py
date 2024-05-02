@@ -227,9 +227,9 @@ for file_name in os.listdir(folder_path):
             #output_video.write(frame)
 
             # Visualization
-            #cv2.imshow('dil+ero', ~morphed_thresh_ero)
-            #cv2.imshow('dil', ~morphed_thresh_dil)
-            #cv2.imshow('Processed Frame', frame)
+            cv2.imshow('dil+ero', ~morphed_thresh_ero)
+            cv2.imshow('dil', ~morphed_thresh_dil)
+            cv2.imshow('Processed Frame', frame)
 
             key = cv2.waitKey(30)
             if key == 27:
@@ -347,6 +347,23 @@ for file_name in os.listdir(folder_path):
 
     # Export the results dataframe
     results_df.to_csv(str(file_name) + "_results_df.csv")
+    results_df = pd.DataFrame(columns=['video_name', 
+                                   'frame_number', 
+                                   'time [sec]', 
+                                   'num_contours_per_frame', 
+                                   'ID', 
+                                   'cx_pos [px]', 
+                                   'cy_pos [px]', 
+                                   'cx_pos [m]',
+                                   'cy_pos [m]', 
+                                   'size [px^2]', 
+                                   'size [m^2]', 
+                                   'perimeter [px]',
+                                   'perimeter [m]',
+                                   'approx_diameter [px]',
+                                   'approx_diameter [m]',
+                                   'x_velocity [m/s]',
+                                   'y_velocity [m/s]'])
 
 # Plotting the diagram
 #plt.figure(figsize=(12, 6))
